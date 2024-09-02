@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 600px;
+            width: 100%;
+            margin: 20px auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Location Tracker</h1>
+    <form id="phoneForm">
+        <label for="phone_number">Enter phone number with country code:</label>
+        <input type="text" id="phone_number" name="phone_number" required>
+        <button type="submit">Track Location</button>
+    </form>
+    <div id="map"></div>
+    <div id="info"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([20.5937, 78.9629], 5); // Default view
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var marker = L.marker([20.5937, 78.9629]).addTo(map); // Default marker
+
+        document.getElementById('phoneForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var phoneNumber = document.getElementById('phone_number').value;
+            fetch('/track', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'phone_number=' + encodeURIComponent(phoneNumber)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.lat && data.lng) {
+                    marker.setLatLng([data.lat, data.lng]);
+                    map.setView([data.lat, data.lng], 13);
+
+                    var popupContent = `<b>${data.location}</b><br>${data.details}<br>Latitude: ${data.lat}<br>Longitude: ${data.lng}<br>Time: ${data.time}`;
+                    marker.bindPopup(popupContent).openPopup();
+
+                    // Open the map service in a new tab
+                    var mapUrl = `https://www.google.com/maps?q=${data.lat},${data.lng}`;
+                    window.open(mapUrl, '_blank');
+                } else {
+                    document.getElementById('info').innerHTML = `<p class="error">${data.error}</p>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('info').innerHTML = `<p class="error">An error occurred. Please try again.</p>`;
+            });
+        });
+
+        function updateLiveLocation() {
+            fetch('/live_update')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.lat && data.lng) {
+                        marker.setLatLng([data.lat, data.lng]);
+                        map.setView([data.lat, data.lng], 13);
+
+                        var popupContent = `<b>${data.location}</b><br>${data.details}<br>Latitude: ${data.lat}<br>Longitude: ${data.lng}<br>Time: ${data.time}`;
+                        marker.bindPopup(popupContent).openPopup();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        setInterval(updateLiveLocation, 10000); // Update every 10 seconds
+    </script>
+</body>
+</html>
